@@ -1,0 +1,170 @@
+---
+title: Análisis Económico de la Propuesta Ambiental para la Descontaminación del Lago
+  Ypacaraí
+author: "Tu Nombre"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Configuración y Librerías
+
+Instalar y cargar las bibliotecas necesarias
+
+```{r}
+# Función para instalar y cargar paquetes
+install_and_load <- function(package){
+  if (!requireNamespace(package, quietly = TRUE)) {
+    install.packages(package)
+  }
+  library(package, character.only = TRUE)
+}
+
+# Instalar y cargar los paquetes necesarios
+packages <- c("tidyverse", "lubridate", "scales", "FinCal")
+sapply(packages, install_and_load)
+
+
+
+```
+
+## Importación y Preparación de Datos
+
+Crear un dataframe con los costos y beneficios proyectados para los próximos 20 años
+
+```{r}
+# Crear un dataframe con los costos y beneficios anuales proyectados (datos ajustados)
+data <- data.frame(
+  year = 1:20,
+  cost = c(2000000000, rep(300000000, 19)),  # Costos: 2 mil millones el primer año, 300 millones los siguientes
+  benefit = c(0, rep(800000000, 19))  # Beneficios: 0 el primer año, 800 millones los siguientes
+)
+
+# Añadir columna de flujo neto (beneficio - costo)
+data <- data %>%
+  mutate(net_flow = benefit - cost)
+
+```
+
+## Análisis Costo-Beneficio (ACB)
+
+Calcular el Valor Actual Neto (VAN) y la Tasa Interna de Retorno (TIR)
+
+```{r}
+# Definir tasa de descuento
+discount_rate <- 0.08  # Ajustando la tasa de descuento a un valor más realista
+
+# Calcular el Valor Actual de cada año
+data <- data %>%
+  mutate(pv_cost = cost / (1 + discount_rate) ^ year,
+         pv_benefit = benefit / (1 + discount_rate) ^ year,
+         pv_net_flow = net_flow / (1 + discount_rate) ^ year)
+
+# Calcular el VAN (sumatoria de flujos netos presentes)
+VAN <- sum(data$pv_net_flow)
+print(paste("Valor Actual Neto (VAN):", scales::dollar(VAN, prefix = "Gs ")))
+
+# Calcular la TIR usando el paquete FinCal
+TIR <- FinCal::irr(cf = data$net_flow)
+print(paste("Tasa Interna de Retorno (TIR):", scales::percent(TIR)))
+
+
+
+```
+
+## Análisis de Costo de Oportunidad
+
+Evaluar los beneficios perdidos por no utilizar el lago para otras actividades
+```{r}
+# Beneficios anuales perdidos por otras actividades económicas (por ejemplo, 200 millones)
+benefits_lost <- 200000000
+
+# Crear un dataframe para los beneficios perdidos
+data_cost_opportunity <- data.frame(
+  year = 1:20,
+  benefits_lost = rep(benefits_lost, 20)
+)
+
+# Calcular el Valor Actual de los beneficios perdidos
+data_cost_opportunity <- data_cost_opportunity %>%
+  mutate(pv_benefits_lost = benefits_lost / (1 + discount_rate) ^ year)
+
+# Calcular el VAN de los beneficios perdidos
+VAN_lost <- sum(data_cost_opportunity$pv_benefits_lost)
+print(paste("Valor Actual Neto de Beneficios Perdidos:", scales::dollar(VAN_lost, prefix = "Gs ")))
+
+# Comparar con el VAN de la conservación
+net_benefit_conservation <- VAN - VAN_lost
+print(paste("Beneficio Neto de la Conservación:", scales::dollar(net_benefit_conservation, prefix = "Gs ")))
+
+```
+
+## Evaluación Microeconómica
+
+Analizar el impacto en hogares y empresas locales
+```{r}
+# Supongamos que tenemos datos de costos y beneficios para hogares y empresas locales
+data_microeconomic <- data.frame(
+  year = 1:20,
+  household_cost_savings = c(0, rep(25000000, 19)),  # Ahorros en costos de salud y otros
+  business_revenue_increase = c(0, rep(60000000, 19))  # Incremento en ingresos por turismo y pesca
+)
+
+# Calcular el Valor Actual de los ahorros e incrementos de ingresos
+data_microeconomic <- data_microeconomic %>%
+  mutate(pv_household_savings = household_cost_savings / (1 + discount_rate) ^ year,
+         pv_business_revenue = business_revenue_increase / (1 + discount_rate) ^ year)
+
+# Sumar los valores presentes para obtener el impacto económico total
+total_microeconomic_impact <- sum(data_microeconomic$pv_household_savings) + sum(data_microeconomic$pv_business_revenue)
+print(paste("Impacto Económico Total en Hogares y Empresas Locales:", scales::dollar(total_microeconomic_impact, prefix = "Gs ")))
+
+```
+## Visualización de Resultados
+
+Crear gráficos para visualizar los flujos de costos y beneficios
+```{r}
+# Gráfico de flujos de caja
+ggplot(data, aes(x = year)) +
+  geom_line(aes(y = cost, color = "Costos")) +
+  geom_line(aes(y = benefit, color = "Beneficios")) +
+  geom_line(aes(y = net_flow, color = "Flujo Neto")) +
+  scale_y_continuous(labels = scales::dollar_format(prefix = "Gs ")) +
+  labs(title = "Flujos de Caja Anuales",
+       x = "Año",
+       y = "Monto (Gs)",
+       color = "Leyenda") +
+  theme_minimal()
+
+# Gráfico de VAN acumulado
+data <- data %>%
+  mutate(cumulative_van = cumsum(pv_net_flow))
+
+ggplot(data, aes(x = year, y = cumulative_van)) +
+  geom_line(color = "blue") +
+  scale_y_continuous(labels = scales::dollar_format(prefix = "Gs ")) +
+  labs(title = "VAN Acumulado a lo Largo del Tiempo",
+       x = "Año",
+       y = "Valor Actual Neto (Gs)") +
+  theme_minimal()
+
+```
+## Interpretación y Conclusión
+
+Interpretar los resultados obtenidos
+```{r}
+# Interpretación de los resultados
+cat("Interpretación de los Resultados:\n")
+cat("1. El Valor Actual Neto (VAN) positivo de", scales::dollar(VAN, prefix = "Gs "), "indica que los beneficios de la descontaminación superan los costos.\n")
+cat("2. La Tasa Interna de Retorno (TIR) de", scales::percent(TIR), "es mayor que la tasa de descuento, lo que sugiere que la inversión es rentable.\n")
+cat("3. El análisis de costo de oportunidad muestra que el beneficio neto de la conservación es", scales::dollar(net_benefit_conservation, prefix = "Gs "), ", lo que refuerza la viabilidad económica de la propuesta.\n")
+cat("4. La evaluación microeconómica revela un impacto económico total en hogares y empresas locales de", scales::dollar(total_microeconomic_impact, prefix = "Gs "), ", destacando los beneficios sociales y económicos de la implementación de la propuesta.\n")
+
+```
+
